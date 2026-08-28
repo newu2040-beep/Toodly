@@ -1,8 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="72dp"
-        android:height="72dp"
-        android:drawable="@drawable/ic_toodly_icon"
-        android:gravity="center" />
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Soft Depth Ambient Shadow Plate -->
+    <path
+        android:fillColor="#25000000"
+        android:pathData="M38,27 C31.37,27 26,32.37 26,39 L26,71 C26,77.63 31.37,83 38,83 L70,83 C76.63,83 82,77.63 82,71 L82,39 C82,32.37 76.63,27 70,27 Z" />
+
+    <!-- Pure White Rounded Badge Plate -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,25 C31.37,25 26,30.37 26,37 L26,69 C26,75.63 31.37,81 38,81 L70,81 C76.63,81 82,75.63 82,69 L82,37 C82,30.37 76.63,25 70,25 Z" />
+
+    <!-- Subtle Top Inset Highlight -->
+    <path
+        android:fillColor="#F5F3FF"
+        android:pathData="M38,25 C31.37,25 26,30.37 26,37 L26,45 C26,38.37 31.37,33 38,33 L70,33 C76.63,33 82,38.37 82,45 L82,37 C82,30.37 76.63,25 70,25 Z" />
+
+    <!-- Bold Modern Rounded Checkmark in Purple/Violet -->
+    <path
+        android:pathData="M39.5,52.5 L48.5,61.5 L68.5,41.5"
+        android:strokeColor="#7C3AED"
+        android:strokeWidth="6.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Playful Sparkle Accent Dot in Top Right -->
+    <path
+        android:fillColor="#A78BFA"
+        android:pathData="M73,34 A2.5,2.5 0 1,1 68,34 A2.5,2.5 0 1,1 73,34" />
+
+</vector>

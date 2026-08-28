@@ -50,77 +50,146 @@ val AppShapes = Shapes(
 
 @Composable
 fun MyApplicationTheme(
-    themeMode: String = "SYSTEM", // "SYSTEM", "LIGHT", "DARK"
+    themeMode: String = "SYSTEM", // "SYSTEM", "LIGHT", "DARK", "OLED", "CREAM"
     accentName: String = "Lavender",
     compactMode: Boolean = false,
     content: @Composable () -> Unit
 ) {
+    val systemInDark = isSystemInDarkTheme()
     val isDark = when (themeMode) {
-        "DARK" -> true
-        "LIGHT" -> false
-        else -> isSystemInDarkTheme()
+        "DARK", "OLED" -> true
+        "LIGHT", "CREAM" -> false
+        else -> systemInDark
     }
+    val isOled = themeMode == "OLED"
+    val isCream = themeMode == "CREAM"
 
     val palette = AccentPalettes[accentName] ?: AccentPalettes["Lavender"]!!
 
-    val colorScheme = if (isDark) {
-        darkColorScheme(
-            primary = palette.primary,
-            onPrimary = Color.White,
-            primaryContainer = palette.primaryDark,
-            onPrimaryContainer = Color.White,
-            secondary = PastelSkyBlue,
-            onSecondary = Color.White,
-            background = DarkBackground,
-            onBackground = DarkTextPrimary,
-            surface = DarkSurface,
-            onSurface = DarkTextPrimary,
-            surfaceVariant = DarkSurfaceSubtle,
-            onSurfaceVariant = DarkTextSecondary,
-            outline = DarkBorder
-        )
-    } else {
-        lightColorScheme(
-            primary = palette.primary,
-            onPrimary = Color.White,
-            primaryContainer = palette.primaryLight,
-            onPrimaryContainer = palette.primaryDark,
-            secondary = PastelSkyBlue,
-            onSecondary = Color.White,
-            background = LightBackground,
-            onBackground = LightTextPrimary,
-            surface = LightSurface,
-            onSurface = LightTextPrimary,
-            surfaceVariant = LightSurfaceSubtle,
-            onSurfaceVariant = LightTextSecondary,
-            outline = LightBorder
-        )
+    val colorScheme = when {
+        isOled -> {
+            darkColorScheme(
+                primary = palette.primary,
+                onPrimary = Color.White,
+                primaryContainer = palette.primaryDark,
+                onPrimaryContainer = Color.White,
+                secondary = PastelSkyBlue,
+                onSecondary = Color.White,
+                background = OledBackground,
+                onBackground = OledTextPrimary,
+                surface = OledSurface,
+                onSurface = OledTextPrimary,
+                surfaceVariant = OledSurfaceSubtle,
+                onSurfaceVariant = OledTextSecondary,
+                outline = OledBorder
+            )
+        }
+        isCream -> {
+            lightColorScheme(
+                primary = palette.primary,
+                onPrimary = Color.White,
+                primaryContainer = palette.primaryLight,
+                onPrimaryContainer = palette.primaryDark,
+                secondary = PastelPeach,
+                onSecondary = Color.White,
+                background = CreamBackground,
+                onBackground = CreamTextPrimary,
+                surface = CreamSurface,
+                onSurface = CreamTextPrimary,
+                surfaceVariant = CreamSurfaceSubtle,
+                onSurfaceVariant = CreamTextSecondary,
+                outline = CreamBorder
+            )
+        }
+        isDark -> {
+            darkColorScheme(
+                primary = palette.primary,
+                onPrimary = Color.White,
+                primaryContainer = palette.primaryDark,
+                onPrimaryContainer = Color.White,
+                secondary = PastelSkyBlue,
+                onSecondary = Color.White,
+                background = DarkBackground,
+                onBackground = DarkTextPrimary,
+                surface = DarkSurface,
+                onSurface = DarkTextPrimary,
+                surfaceVariant = DarkSurfaceSubtle,
+                onSurfaceVariant = DarkTextSecondary,
+                outline = DarkBorder
+            )
+        }
+        else -> {
+            lightColorScheme(
+                primary = palette.primary,
+                onPrimary = Color.White,
+                primaryContainer = palette.primaryLight,
+                onPrimaryContainer = palette.primaryDark,
+                secondary = PastelSkyBlue,
+                onSecondary = Color.White,
+                background = LightBackground,
+                onBackground = LightTextPrimary,
+                surface = LightSurface,
+                onSurface = LightTextPrimary,
+                surfaceVariant = LightSurfaceSubtle,
+                onSurfaceVariant = LightTextSecondary,
+                outline = LightBorder
+            )
+        }
     }
 
-    val extendedColors = if (isDark) {
-        ExtendedColors(
-            customAccent = palette.primary,
-            customAccentLight = palette.primaryDark.copy(alpha = 0.4f),
-            customAccentDark = palette.primaryLight,
-            cardBackground = DarkSurface,
-            subtleBackground = DarkSurfaceSubtle,
-            cardBorder = DarkBorder,
-            textPrimary = DarkTextPrimary,
-            textSecondary = DarkTextSecondary,
-            textTertiary = DarkTextTertiary
-        )
-    } else {
-        ExtendedColors(
-            customAccent = palette.primary,
-            customAccentLight = palette.primaryLight,
-            customAccentDark = palette.primaryDark,
-            cardBackground = LightSurface,
-            subtleBackground = LightSurfaceSubtle,
-            cardBorder = LightBorder,
-            textPrimary = LightTextPrimary,
-            textSecondary = LightTextSecondary,
-            textTertiary = LightTextTertiary
-        )
+    val extendedColors = when {
+        isOled -> {
+            ExtendedColors(
+                customAccent = palette.primary,
+                customAccentLight = palette.primaryDark.copy(alpha = 0.35f),
+                customAccentDark = palette.primaryLight,
+                cardBackground = OledSurface,
+                subtleBackground = OledSurfaceSubtle,
+                cardBorder = OledBorder,
+                textPrimary = OledTextPrimary,
+                textSecondary = OledTextSecondary,
+                textTertiary = OledTextTertiary
+            )
+        }
+        isCream -> {
+            ExtendedColors(
+                customAccent = palette.primary,
+                customAccentLight = palette.primaryLight,
+                customAccentDark = palette.primaryDark,
+                cardBackground = CreamSurface,
+                subtleBackground = CreamSurfaceSubtle,
+                cardBorder = CreamBorder,
+                textPrimary = CreamTextPrimary,
+                textSecondary = CreamTextSecondary,
+                textTertiary = CreamTextTertiary
+            )
+        }
+        isDark -> {
+            ExtendedColors(
+                customAccent = palette.primary,
+                customAccentLight = palette.primaryDark.copy(alpha = 0.4f),
+                customAccentDark = palette.primaryLight,
+                cardBackground = DarkSurface,
+                subtleBackground = DarkSurfaceSubtle,
+                cardBorder = DarkBorder,
+                textPrimary = DarkTextPrimary,
+                textSecondary = DarkTextSecondary,
+                textTertiary = DarkTextTertiary
+            )
+        }
+        else -> {
+            ExtendedColors(
+                customAccent = palette.primary,
+                customAccentLight = palette.primaryLight,
+                customAccentDark = palette.primaryDark,
+                cardBackground = LightSurface,
+                subtleBackground = LightSurfaceSubtle,
+                cardBorder = LightBorder,
+                textPrimary = LightTextPrimary,
+                textSecondary = LightTextSecondary,
+                textTertiary = LightTextTertiary
+            )
+        }
     }
 
     CompositionLocalProvider(

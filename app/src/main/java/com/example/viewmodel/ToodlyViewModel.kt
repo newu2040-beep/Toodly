@@ -13,6 +13,7 @@ import com.example.data.model.TemplateEntity
 import com.example.data.repository.PreferencesRepository
 import com.example.data.repository.TaskRepository
 import com.example.reminder.ReminderManager
+import com.example.ui.components.DayOverview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -161,6 +162,54 @@ class ToodlyViewModel(application: Application) : AndroidViewModel(application) 
         tasks.count { it.dueDate == today || (it.dueDate.isEmpty() && !it.isCompleted) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    // Weekly Statistics Calculations for Weekly Overview
+    val weeklyDayStats: StateFlow<List<DayOverview>> = combine(allTasks, weekStartDay) { tasks, startDay ->
+        val weekCalendars = getWeekDates(startDay)
+        val todayStr = getTodayDateString()
+        val daySdf = SimpleDateFormat("EEE", Locale.getDefault())
+        val dateSdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+        weekCalendars.map { cal ->
+            val dateStr = dateSdf.format(cal.time)
+            val dayAbbr = daySdf.format(cal.time)
+            val dayLetter = dayAbbr.take(1)
+            val dayOfMonth = cal.get(Calendar.DAY_OF_MONTH)
+            val dayTasks = tasks.filter { it.dueDate == dateStr }
+            val compCount = dayTasks.count { it.isCompleted }
+            val totCount = dayTasks.size
+
+            DayOverview(
+                dayAbbreviation = dayAbbr,
+                dayLetter = dayLetter,
+                dateString = dateStr,
+                dayOfMonth = dayOfMonth,
+                completedCount = compCount,
+                totalCount = totCount,
+                isToday = dateStr == todayStr
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val weeklyCompletedCount: StateFlow<Int> = weeklyDayStats.combine(allTasks) { days, _ ->
+        days.sumOf { it.completedCount }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val weeklyTotalCount: StateFlow<Int> = weeklyDayStats.combine(allTasks) { days, _ ->
+        days.sumOf { it.totalCount }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val weeklyCompletionRate: StateFlow<Int> = combine(weeklyCompletedCount, weeklyTotalCount) { comp, tot ->
+        if (tot > 0) ((comp.toFloat() / tot.toFloat()) * 100).toInt() else 0
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val currentWeekRangeLabel: StateFlow<String> = weekStartDay.combine(allTasks) { startDay, _ ->
+        val weekCalendars = getWeekDates(startDay)
+        if (weekCalendars.isNotEmpty()) {
+            val monthSdf = SimpleDateFormat("MMM d", Locale.getDefault())
+            "${monthSdf.format(weekCalendars.first().time)} - ${monthSdf.format(weekCalendars.last().time)}"
+        } else "This Week"
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "This Week")
+
     init {
         // Create demo tasks if empty on first start
         viewModelScope.launch {
@@ -269,36 +318,78 @@ class ToodlyViewModel(application: Application) : AndroidViewModel(application) 
         _toastMessage.value = null
     }
 
-    fun quickAddTask(title: String, category: String = "Personal", dueDate: String = getTodayDateString(), dueTime: String = "9:00 AM", priority: String = "MEDIUM") {
+    fun toggleCompactMode() {
+        viewModelScope.launch {
+            val current = compactMode.value
+            preferencesRepository.setCompactMode(!current)
+            _toastMessage.value = if (!current) "Compact mode enabled" else "Standard mode enabled"
+        }
+    }
+
+    fun sendTestNotification() {
+        reminderManager.sendImmediateTestNotification(
+            title = "Toodly Reminder Alert 🎯",
+            message = "Your push notifications are fully working! Don't forget your tasks."
+        )
+        _toastMessage.value = "Test notification sent!"
+    }
+
+    fun areNotificationsEnabled(): Boolean {
+        return reminderManager.areNotificationsEnabled()
+    }
+
+    fun quickAddTask(
+        title: String,
+        category: String = "Personal",
+        dueDate: String = getTodayDateString(),
+        dueTime: String = "9:00 AM",
+        priority: String = "MEDIUM",
+        hasReminder: Boolean = false
+    ) {
         if (title.isBlank()) return
         viewModelScope.launch {
+            val reminderTs = if (hasReminder) {
+                ReminderManager.parseDateAndTimeToMillis(dueDate, dueTime) ?: (System.currentTimeMillis() + 3600000)
+            } else null
+
             val task = TaskItem(
                 title = title.trim(),
                 category = category,
                 dueDate = dueDate,
                 dueTime = dueTime,
                 priority = priority,
+                hasReminder = hasReminder,
+                reminderTimestamp = reminderTs,
                 createdAt = System.currentTimeMillis()
             )
             val id = repository.insertTask(task)
-            _toastMessage.value = "Task created"
+            if (hasReminder && reminderTs != null) {
+                reminderManager.scheduleTaskReminder(id, task.title, task.category, reminderTs)
+            }
+            _toastMessage.value = if (hasReminder) "Task created with reminder 🔔" else "Task created"
         }
     }
 
     fun saveTask(task: TaskItem) {
         viewModelScope.launch {
-            if (task.id == 0L) {
-                val newId = repository.insertTask(task)
-                if (task.hasReminder && task.reminderTimestamp != null) {
-                    reminderManager.scheduleTaskReminder(newId, task.title, task.category, task.reminderTimestamp)
+            val reminderTs = if (task.hasReminder) {
+                task.reminderTimestamp ?: ReminderManager.parseDateAndTimeToMillis(task.dueDate, task.dueTime) ?: (System.currentTimeMillis() + 3600000)
+            } else null
+
+            val taskToSave = task.copy(reminderTimestamp = reminderTs)
+
+            if (taskToSave.id == 0L) {
+                val newId = repository.insertTask(taskToSave)
+                if (taskToSave.hasReminder && reminderTs != null) {
+                    reminderManager.scheduleTaskReminder(newId, taskToSave.title, taskToSave.category, reminderTs)
                 }
-                _toastMessage.value = "Task created"
+                _toastMessage.value = if (taskToSave.hasReminder) "Task created with reminder 🔔" else "Task created"
             } else {
-                repository.updateTask(task)
-                if (task.hasReminder && task.reminderTimestamp != null) {
-                    reminderManager.scheduleTaskReminder(task.id, task.title, task.category, task.reminderTimestamp)
+                repository.updateTask(taskToSave)
+                if (taskToSave.hasReminder && reminderTs != null) {
+                    reminderManager.scheduleTaskReminder(taskToSave.id, taskToSave.title, taskToSave.category, reminderTs)
                 } else {
-                    reminderManager.cancelTaskReminder(task.id)
+                    reminderManager.cancelTaskReminder(taskToSave.id)
                 }
                 _toastMessage.value = "Task updated"
             }
@@ -491,6 +582,30 @@ class ToodlyViewModel(application: Application) : AndroidViewModel(application) 
             calendar.add(Calendar.DAY_OF_YEAR, daysOffset)
             val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             return sdf.format(calendar.time)
+        }
+
+        fun getWeekDates(startDayPref: String = "Monday"): List<Calendar> {
+            val cal = Calendar.getInstance()
+            val isSundayStart = startDayPref.equals("Sunday", ignoreCase = true)
+            cal.firstDayOfWeek = if (isSundayStart) Calendar.SUNDAY else Calendar.MONDAY
+
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+
+            val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
+            val firstDay = cal.firstDayOfWeek
+            val diff = (dayOfWeek - firstDay + 7) % 7
+            cal.add(Calendar.DAY_OF_YEAR, -diff)
+
+            val week = mutableListOf<Calendar>()
+            for (i in 0 until 7) {
+                val dayCal = cal.clone() as Calendar
+                week.add(dayCal)
+                cal.add(Calendar.DAY_OF_YEAR, 1)
+            }
+            return week
         }
     }
 }

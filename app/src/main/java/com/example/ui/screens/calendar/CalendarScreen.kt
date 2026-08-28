@@ -354,8 +354,8 @@ fun CalendarScreen(
         QuickAddSheet(
             categories = categories,
             onDismiss = { showQuickAdd = false },
-            onAddTask = { title, category, _, dueTime, priority ->
-                viewModel.quickAddTask(title, category, selectedDateStr, dueTime, priority)
+            onAddTask = { title, category, _, dueTime, priority, hasReminder ->
+                viewModel.quickAddTask(title, category, selectedDateStr, dueTime, priority, hasReminder)
             }
         )
     }

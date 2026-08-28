@@ -16,7 +16,10 @@ import com.example.data.local.ToodlyDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 class ReminderManager(private val context: Context) {
 
@@ -41,8 +44,10 @@ class ReminderManager(private val context: Context) {
                     "Task Reminders",
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "Timely reminders for scheduled tasks"
+                    description = "Timely reminders for scheduled tasks and to-dos"
                     enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 300, 200, 300)
+                    setShowBadge(true)
                 }
 
                 val dailyChannel = NotificationChannel(
@@ -50,11 +55,49 @@ class ReminderManager(private val context: Context) {
                     "Daily Planning",
                     NotificationManager.IMPORTANCE_DEFAULT
                 ).apply {
-                    description = "Daily morning or evening planning reminders"
+                    description = "Daily morning and evening planning reminders"
+                    enableVibration(true)
+                    setShowBadge(true)
                 }
 
                 notificationManager.createNotificationChannel(taskChannel)
                 notificationManager.createNotificationChannel(dailyChannel)
+            }
+        }
+
+        fun parseDateAndTimeToMillis(dueDate: String, dueTime: String): Long? {
+            if (dueDate.isBlank()) return null
+            val timeToParse = if (dueTime.isBlank()) "09:00 AM" else dueTime.trim()
+            val formats = listOf(
+                "yyyy-MM-dd h:mm a",
+                "yyyy-MM-dd hh:mm a",
+                "yyyy-MM-dd H:mm",
+                "yyyy-MM-dd HH:mm"
+            )
+            for (format in formats) {
+                try {
+                    val sdf = SimpleDateFormat(format, Locale.US)
+                    sdf.isLenient = false
+                    val date = sdf.parse("$dueDate $timeToParse")
+                    if (date != null) {
+                        return date.time
+                    }
+                } catch (_: Exception) {}
+            }
+            // Fallback: parse just date and set to 9 AM
+            return try {
+                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                val date = sdf.parse(dueDate)
+                if (date != null) {
+                    val cal = Calendar.getInstance()
+                    cal.time = date
+                    cal.set(Calendar.HOUR_OF_DAY, 9)
+                    cal.set(Calendar.MINUTE, 0)
+                    cal.set(Calendar.SECOND, 0)
+                    cal.timeInMillis
+                } else null
+            } catch (_: Exception) {
+                null
             }
         }
     }
@@ -63,6 +106,42 @@ class ReminderManager(private val context: Context) {
 
     init {
         createNotificationChannels(context)
+    }
+
+    fun areNotificationsEnabled(): Boolean {
+        return NotificationManagerCompat.from(context).areNotificationsEnabled()
+    }
+
+    fun sendImmediateTestNotification(title: String = "Toodly Reminder Alert ✨", message: String = "Don't forget to complete your pending tasks!") {
+        createNotificationChannels(context)
+
+        val openAppIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val openAppPendingIntent = PendingIntent.getActivity(
+            context,
+            88888,
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_TASK_REMINDERS)
+            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$message\n\nStay on track with your day and check off your to-dos! 🎯"))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setAutoCancel(true)
+            .setContentIntent(openAppPendingIntent)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .build()
+
+        try {
+            NotificationManagerCompat.from(context).notify(88888, notification)
+        } catch (_: SecurityException) {
+            // Notifications disabled or permission missing
+        }
     }
 
     fun scheduleTaskReminder(taskId: Long, title: String, category: String, triggerAtMillis: Long) {
@@ -97,11 +176,13 @@ class ReminderManager(private val context: Context) {
                 )
             }
         } catch (_: SecurityException) {
-            alarmManager.set(
-                AlarmManager.RTC_WAKEUP,
-                triggerAtMillis,
-                pendingIntent
-            )
+            try {
+                alarmManager.set(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerAtMillis,
+                    pendingIntent
+                )
+            } catch (_: Exception) {}
         }
     }
 
@@ -145,12 +226,14 @@ class ReminderManager(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        alarmManager.setInexactRepeating(
-            AlarmManager.RTC_WAKEUP,
-            calendar.timeInMillis,
-            AlarmManager.INTERVAL_DAY,
-            pendingIntent
-        )
+        try {
+            alarmManager.setInexactRepeating(
+                AlarmManager.RTC_WAKEUP,
+                calendar.timeInMillis,
+                AlarmManager.INTERVAL_DAY,
+                pendingIntent
+            )
+        } catch (_: Exception) {}
     }
 
     fun cancelDailyPlanning() {
@@ -219,12 +302,15 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
 
         val notification = NotificationCompat.Builder(context, ReminderManager.CHANNEL_TASK_REMINDERS)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
-            .setContentTitle(title)
+            .setContentTitle("⏰ Reminder: $title")
             .setContentText("Due now • $category")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Time to complete: $title\nCategory: $category"))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setAutoCancel(true)
             .setContentIntent(openAppPendingIntent)
             .addAction(android.R.drawable.checkbox_on_background, "Mark Done", markDonePendingIntent)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .build()
 
         try {
@@ -249,9 +335,12 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
             .setContentTitle("Plan your day with Toodly ✨")
             .setContentText("Check your tasks and set today's top priorities!")
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Good morning! Take a moment to review today's schedule and organize your tasks for maximum focus. 🎯"))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setAutoCancel(true)
             .setContentIntent(openAppPendingIntent)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .build()
 
         try {
@@ -276,3 +365,4 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
         }
     }
 }
+

@@ -1,17 +1,18 @@
 package com.example.ui.screens.welcome
 
 import android.Manifest
+import android.app.AlarmManager
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,31 +20,27 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.example.R
 import com.example.ui.theme.LocalExtendedColors
 import com.example.ui.theme.PastelLavender
 import com.example.ui.theme.PastelLavenderLight
+import com.example.ui.theme.PastelYellow
+import com.example.ui.theme.PastelYellowLight
 
 @Composable
 fun WelcomeScreen(
@@ -54,14 +51,39 @@ fun WelcomeScreen(
     val context = LocalContext.current
     val extendedColors = LocalExtendedColors.current
 
-    var step by remember { mutableStateOf(1) } // 1: Welcome, 2: Notifications, 3: Daily Planning
+    var step by remember { mutableStateOf(1) } // 1: Welcome Hero, 2: Permissions, 3: Daily Planning
     var selectedReminderTime by remember { mutableStateOf("08:00 AM") }
     var reminderEnabled by remember { mutableStateOf(true) }
 
+    // Check notification permission state dynamically
+    var hasNotificationPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            } else true
+        )
+    }
+
+    // Check exact alarm permission state
+    val canScheduleExactAlarms by remember {
+        derivedStateOf {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                alarmManager?.canScheduleExactAlarms() ?: true
+            } else true
+        }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { _ ->
-        step = 3
+    ) { isGranted ->
+        hasNotificationPermission = isGranted
+        if (isGranted) {
+            step = 3
+        }
     }
 
     Scaffold(
@@ -78,16 +100,27 @@ fun WelcomeScreen(
         ) {
             // Step Progress Indicator
             Row(
-                modifier = Modifier.padding(top = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .testTag("welcome_step_indicator"),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 listOf(1, 2, 3).forEach { index ->
+                    val isCurrent = step == index
+                    val isPassed = step > index
                     Box(
                         modifier = Modifier
-                            .width(if (step == index) 28.dp else 8.dp)
+                            .width(if (isCurrent) 28.dp else 8.dp)
                             .height(8.dp)
                             .clip(CircleShape)
-                            .background(if (step == index) extendedColors.customAccent else extendedColors.cardBorder)
+                            .background(
+                                when {
+                                    isCurrent -> extendedColors.customAccent
+                                    isPassed -> extendedColors.customAccent.copy(alpha = 0.5f)
+                                    else -> extendedColors.cardBorder
+                                }
+                            )
                     )
                 }
             }
@@ -99,37 +132,68 @@ fun WelcomeScreen(
                         slideOutHorizontally { width -> -width } + fadeOut()
                     )
                 },
-                label = "welcomeStep"
+                label = "welcome_step_content",
+                modifier = Modifier.weight(1f, fill = false)
             ) { currentStep ->
                 when (currentStep) {
                     1 -> {
-                        // Step 1: Brand & Hero Illustration
+                        // Step 1: Brand & Hero Showcase (Modern Vector App Icon Logo)
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            // Toodly Logo Badge
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Modern 3D-styled App Icon Emblem
                             Box(
                                 modifier = Modifier
-                                    .size(72.dp)
-                                    .clip(RoundedCornerShape(22.dp))
-                                    .background(extendedColors.customAccentLight)
-                                    .border(1.5.dp, extendedColors.customAccent.copy(alpha = 0.3f), RoundedCornerShape(22.dp)),
+                                    .size(96.dp)
+                                    .shadow(
+                                        elevation = 18.dp,
+                                        shape = RoundedCornerShape(28.dp),
+                                        spotColor = extendedColors.customAccent.copy(alpha = 0.4f),
+                                        ambientColor = extendedColors.customAccent.copy(alpha = 0.2f)
+                                    )
+                                    .clip(RoundedCornerShape(28.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(
+                                                extendedColors.customAccent,
+                                                extendedColors.customAccent.copy(alpha = 0.85f)
+                                            )
+                                        )
+                                    )
+                                    .border(
+                                        width = 1.5.dp,
+                                        color = Color.White.copy(alpha = 0.4f),
+                                        shape = RoundedCornerShape(28.dp)
+                                    )
+                                    .testTag("welcome_app_logo"),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = extendedColors.customAccent,
-                                    modifier = Modifier.size(38.dp)
-                                )
+                                // Inner Floating Plate
+                                Box(
+                                    modifier = Modifier
+                                        .size(62.dp)
+                                        .clip(RoundedCornerShape(18.dp))
+                                        .background(Color.White)
+                                        .shadow(4.dp, RoundedCornerShape(18.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Toodly Logo Checkmark",
+                                        tint = extendedColors.customAccent,
+                                        modifier = Modifier.size(38.dp)
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(20.dp))
 
                             Text(
                                 text = "Toodly",
-                                fontSize = 36.sp,
+                                fontSize = 34.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = extendedColors.textPrimary,
                                 letterSpacing = (-0.5).sp
@@ -138,104 +202,328 @@ fun WelcomeScreen(
                             Spacer(modifier = Modifier.height(6.dp))
 
                             Text(
-                                text = "Plan Today,\nAchieve Tomorrow",
-                                fontSize = 18.sp,
+                                text = "Plan Today, Achieve Tomorrow",
+                                fontSize = 17.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = extendedColors.textSecondary,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 24.sp
+                                textAlign = TextAlign.Center
                             )
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(22.dp))
 
-                            // 3D Clipboard Card Illustration
+                            // Interactive Task Card Preview
                             Card(
                                 modifier = Modifier
-                                    .size(240.dp)
-                                    .shadow(16.dp, RoundedCornerShape(28.dp), spotColor = extendedColors.customAccent.copy(alpha = 0.2f)),
-                                shape = RoundedCornerShape(28.dp),
-                                colors = CardDefaults.cardColors(containerColor = extendedColors.cardBackground)
+                                    .fillMaxWidth()
+                                    .shadow(12.dp, RoundedCornerShape(22.dp), spotColor = extendedColors.customAccent.copy(alpha = 0.15f)),
+                                shape = RoundedCornerShape(22.dp),
+                                colors = CardDefaults.cardColors(containerColor = extendedColors.cardBackground),
+                                border = BorderStroke(1.dp, extendedColors.cardBorder)
                             ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.welcome_illustration),
-                                    contentDescription = "Welcome task clipboard",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(18.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Today's Focus",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = extendedColors.textPrimary
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(PastelYellowLight)
+                                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Text("3 Tasks", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = PastelYellow)
+                                        }
+                                    }
+
+                                    // Mock Task 1
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(extendedColors.subtleBackground)
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(20.dp)
+                                                .clip(CircleShape)
+                                                .background(extendedColors.customAccent),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                        }
+                                        Text(
+                                            text = "Morning Planning & Review",
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = extendedColors.textPrimary,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(extendedColors.customAccent)
+                                        )
+                                    }
+
+                                    // Mock Task 2
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(extendedColors.subtleBackground)
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(20.dp)
+                                                .clip(CircleShape)
+                                                .border(1.5.dp, extendedColors.textTertiary, CircleShape)
+                                        )
+                                        Text(
+                                            text = "Finalize Design Specifications",
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = extendedColors.textPrimary,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Text(
+                                            text = "02:00 PM",
+                                            fontSize = 11.sp,
+                                            color = extendedColors.textSecondary
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
 
                     2 -> {
-                        // Step 2: Notifications Permission
+                        // Step 2: Full Notification & Reminders Permission Flow
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.fillMaxWidth()
                         ) {
+                            Spacer(modifier = Modifier.height(8.dp))
+
                             Box(
                                 modifier = Modifier
-                                    .size(90.dp)
+                                    .size(86.dp)
                                     .clip(CircleShape)
                                     .background(extendedColors.customAccentLight),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.NotificationsActive,
+                                    imageVector = if (hasNotificationPermission) Icons.Default.NotificationsActive else Icons.Default.Notifications,
                                     contentDescription = null,
                                     tint = extendedColors.customAccent,
-                                    modifier = Modifier.size(48.dp)
+                                    modifier = Modifier.size(46.dp)
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(18.dp))
 
                             Text(
-                                text = "Stay on Track",
-                                fontSize = 28.sp,
+                                text = "Enable Notifications",
+                                fontSize = 26.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = extendedColors.textPrimary
                             )
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
                             Text(
-                                text = "Get gentle reminders when tasks are due so you never miss an important moment.",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Normal,
+                                text = "Get on-time alerts, exact alarms, and daily planning summaries right when you need them.",
+                                fontSize = 14.5.sp,
                                 color = extendedColors.textSecondary,
                                 textAlign = TextAlign.Center,
-                                lineHeight = 22.sp,
-                                modifier = Modifier.padding(horizontal = 16.dp)
+                                lineHeight = 20.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp)
                             )
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(18.dp))
 
+                            // Permission Details Card
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(20.dp),
                                 colors = CardDefaults.cardColors(containerColor = extendedColors.cardBackground),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, extendedColors.cardBorder)
+                                border = BorderStroke(1.dp, extendedColors.cardBorder)
                             ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text(
-                                        text = "✓ 100% Offline & Private",
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 14.sp,
-                                        color = extendedColors.textPrimary
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // Item 1: Due date alerts
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(extendedColors.customAccentLight),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Alarm,
+                                                contentDescription = null,
+                                                tint = extendedColors.customAccent,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Exact Due Alarms",
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = extendedColors.textPrimary
+                                            )
+                                            Text(
+                                                text = "Sound & vibration alerts scheduled to the exact minute",
+                                                fontSize = 11.5.sp,
+                                                color = extendedColors.textSecondary
+                                            )
+                                        }
+                                        if (hasNotificationPermission) {
+                                            Icon(
+                                                imageVector = Icons.Default.CheckCircle,
+                                                contentDescription = "Granted",
+                                                tint = extendedColors.customAccent,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Divider(color = extendedColors.cardBorder.copy(alpha = 0.6f))
+
+                                    // Item 2: Morning Planning Digest
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(PastelYellowLight),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.WbSunny,
+                                                contentDescription = null,
+                                                tint = PastelYellow,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Daily Morning Briefing",
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = extendedColors.textPrimary
+                                            )
+                                            Text(
+                                                text = "A gentle heads-up summary to organize your schedule",
+                                                fontSize = 11.5.sp,
+                                                color = extendedColors.textSecondary
+                                            )
+                                        }
+                                        if (hasNotificationPermission) {
+                                            Icon(
+                                                imageVector = Icons.Default.CheckCircle,
+                                                contentDescription = "Granted",
+                                                tint = extendedColors.customAccent,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Divider(color = extendedColors.cardBorder.copy(alpha = 0.6f))
+
+                                    // Item 3: 100% Offline & Private
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(extendedColors.customAccentLight),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Lock,
+                                                contentDescription = null,
+                                                tint = extendedColors.customAccent,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "100% Local & Private",
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = extendedColors.textPrimary
+                                            )
+                                            Text(
+                                                text = "All notifications run locally on device with zero cloud tracking",
+                                                fontSize = 11.5.sp,
+                                                color = extendedColors.textSecondary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Notification status indicator badge
+                            if (hasNotificationPermission) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(extendedColors.customAccentLight)
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = extendedColors.customAccent,
+                                        modifier = Modifier.size(16.dp)
                                     )
-                                    Spacer(modifier = Modifier.height(6.dp))
                                     Text(
-                                        text = "✓ Zero Ads, Zero Spam, Always Free",
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 14.sp,
-                                        color = extendedColors.textPrimary
-                                    )
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        text = "✓ Full control in app settings",
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 14.sp,
-                                        color = extendedColors.textPrimary
+                                        text = "Full Notification Access Granted",
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = extendedColors.customAccent
                                     )
                                 }
                             }
@@ -243,53 +531,54 @@ fun WelcomeScreen(
                     }
 
                     3 -> {
-                        // Step 3: Daily Planning Routine
+                        // Step 3: Daily Planning Routine Setup
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.fillMaxWidth()
                         ) {
+                            Spacer(modifier = Modifier.height(8.dp))
+
                             Box(
                                 modifier = Modifier
-                                    .size(90.dp)
+                                    .size(86.dp)
                                     .clip(CircleShape)
-                                    .background(extendedColors.customAccentLight),
+                                    .background(PastelYellowLight),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.WbSunny,
                                     contentDescription = null,
-                                    tint = extendedColors.customAccent,
-                                    modifier = Modifier.size(48.dp)
+                                    tint = PastelYellow,
+                                    modifier = Modifier.size(46.dp)
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(18.dp))
 
                             Text(
                                 text = "Daily Planning",
-                                fontSize = 28.sp,
+                                fontSize = 26.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = extendedColors.textPrimary
                             )
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
                             Text(
                                 text = "Start each morning with a quick 1-minute plan for a calm, productive day.",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Normal,
+                                fontSize = 14.5.sp,
                                 color = extendedColors.textSecondary,
                                 textAlign = TextAlign.Center,
-                                lineHeight = 22.sp
+                                lineHeight = 20.sp
                             )
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(20.dp))
 
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(20.dp),
                                 colors = CardDefaults.cardColors(containerColor = extendedColors.cardBackground),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, extendedColors.cardBorder)
+                                border = BorderStroke(1.dp, extendedColors.cardBorder)
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Row(
@@ -297,7 +586,19 @@ fun WelcomeScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("Daily Reminder", fontWeight = FontWeight.Bold, color = extendedColors.textPrimary)
+                                        Column {
+                                            Text(
+                                                "Morning Daily Reminder",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp,
+                                                color = extendedColors.textPrimary
+                                            )
+                                            Text(
+                                                "Brief review notification",
+                                                fontSize = 12.sp,
+                                                color = extendedColors.textSecondary
+                                            )
+                                        }
                                         Switch(
                                             checked = reminderEnabled,
                                             onCheckedChange = { reminderEnabled = it },
@@ -309,9 +610,14 @@ fun WelcomeScreen(
                                     }
 
                                     if (reminderEnabled) {
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        Text("Choose Time", fontSize = 13.sp, color = extendedColors.textSecondary)
-                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Spacer(modifier = Modifier.height(14.dp))
+                                        Text(
+                                            "Choose Preferred Time",
+                                            fontSize = 12.5.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = extendedColors.textSecondary
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -324,13 +630,13 @@ fun WelcomeScreen(
                                                         .clip(RoundedCornerShape(12.dp))
                                                         .background(if (isSelected) extendedColors.customAccent else extendedColors.subtleBackground)
                                                         .clickable { selectedReminderTime = time }
-                                                        .padding(vertical = 8.dp),
+                                                        .padding(vertical = 10.dp),
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Text(
                                                         text = time,
                                                         color = if (isSelected) Color.White else extendedColors.textPrimary,
-                                                        fontSize = 12.sp,
+                                                        fontSize = 12.5.sp,
                                                         fontWeight = FontWeight.SemiBold
                                                     )
                                                 }
@@ -344,7 +650,7 @@ fun WelcomeScreen(
                 }
             }
 
-            // Bottom Navigation Action Button
+            // Bottom Action Navigation
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -357,11 +663,7 @@ fun WelcomeScreen(
                             1 -> step = 2
                             2 -> {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    val hasPermission = ContextCompat.checkSelfPermission(
-                                        context,
-                                        Manifest.permission.POST_NOTIFICATIONS
-                                    ) == PackageManager.PERMISSION_GRANTED
-                                    if (!hasPermission) {
+                                    if (!hasNotificationPermission) {
                                         permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                     } else {
                                         step = 3
@@ -380,15 +682,21 @@ fun WelcomeScreen(
                         .fillMaxWidth()
                         .height(56.dp)
                         .testTag("welcome_get_started_button"),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = extendedColors.customAccent,
                         contentColor = Color.White
                     )
                 ) {
+                    val buttonText = when (step) {
+                        1 -> "Get Started →"
+                        2 -> if (hasNotificationPermission) "Continue →" else "Grant Full Notification Access"
+                        3 -> "Start Planning ✨"
+                        else -> "Continue"
+                    }
                     Text(
-                        text = if (step == 3) "Start Planning ✨" else if (step == 2) "Enable Notifications" else "Get Started →",
-                        fontSize = 17.sp,
+                        text = buttonText,
+                        fontSize = 16.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }

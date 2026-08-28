@@ -9,15 +9,15 @@
         android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:angle="45"
+                android:angle="135"
                 android:endX="108"
                 android:endY="108"
                 android:startX="0"
                 android:startY="0"
                 android:type="linear">
-                <item android:color="#F3E8FF" android:offset="0.0" />
-                <item android:color="#E0E7FF" android:offset="0.5" />
-                <item android:color="#EDE9FE" android:offset="1.0" />
+                <item android:color="#9065F6" android:offset="0.0" />
+                <item android:color="#7C3AED" android:offset="0.5" />
+                <item android:color="#6D28D9" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>

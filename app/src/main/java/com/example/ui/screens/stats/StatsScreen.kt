@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.TaskItem
+import com.example.ui.components.WeeklyOverview
 import com.example.ui.components.getCategoryPastelColors
 import com.example.ui.theme.LocalCompactMode
 import com.example.ui.theme.LocalExtendedColors
@@ -41,6 +42,10 @@ fun StatsScreen(
     val extendedColors = LocalExtendedColors.current
     val isCompact = LocalCompactMode.current
     val allTasks by viewModel.allTasks.collectAsState()
+    val weeklyCompleted by viewModel.weeklyCompletedCount.collectAsState()
+    val weeklyTotal by viewModel.weeklyTotalCount.collectAsState()
+    val weeklyDays by viewModel.weeklyDayStats.collectAsState()
+    val weekRangeLabel by viewModel.currentWeekRangeLabel.collectAsState()
 
     val totalTasks = allTasks.size
     val completedTasks = allTasks.count { it.isCompleted }
@@ -58,12 +63,6 @@ fun StatsScreen(
                 val comp = entry.value.count { it.isCompleted }
                 Pair(comp, total)
             }
-    }
-
-    // Weekly day counts
-    val weekDays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-    val weekCompletionRatios = remember(allTasks) {
-        listOf(0.85f, 0.90f, 0.70f, 1.0f, 0.60f, 0.80f, 0.75f)
     }
 
     Scaffold(
@@ -243,62 +242,14 @@ fun StatsScreen(
                     }
                 }
 
-                // Weekly Activity Bar Chart Card
+                // Weekly Overview Component with Completion Rate and Simple Progress Indicator
                 item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(if (isCompact) 16.dp else 24.dp),
-                        colors = CardDefaults.cardColors(containerColor = extendedColors.cardBackground),
-                        border = BorderStroke(1.dp, extendedColors.cardBorder)
-                    ) {
-                        Column(modifier = Modifier.padding(if (isCompact) 12.dp else 18.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Weekly Completion", fontSize = if (isCompact) 14.sp else 16.sp, fontWeight = FontWeight.Bold, color = extendedColors.textPrimary)
-                                Text("This Week", fontSize = if (isCompact) 11.sp else 12.sp, color = extendedColors.textSecondary)
-                            }
-
-                            Spacer(modifier = Modifier.height(if (isCompact) 10.dp else 18.dp))
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(if (isCompact) 80.dp else 110.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Bottom
-                            ) {
-                                weekDays.forEachIndexed { index, day ->
-                                    val ratio = weekCompletionRatios[index]
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Bottom,
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .width(if (isCompact) 14.dp else 18.dp)
-                                                .height(((if (isCompact) 55 else 80) * ratio).dp.coerceAtLeast(8.dp))
-                                                .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                                                .background(
-                                                    if (index == 3) extendedColors.customAccent
-                                                    else extendedColors.customAccentLight
-                                                )
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = day,
-                                            fontSize = if (isCompact) 10.sp else 11.sp,
-                                            fontWeight = if (index == 3) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (index == 3) extendedColors.customAccent else extendedColors.textTertiary
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    WeeklyOverview(
+                        completedTasks = weeklyCompleted,
+                        totalTasks = weeklyTotal,
+                        weekDays = weeklyDays,
+                        weekRangeLabel = weekRangeLabel
+                    )
                 }
 
                 // Category Distribution Card

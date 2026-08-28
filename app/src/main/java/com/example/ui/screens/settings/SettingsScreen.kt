@@ -1,8 +1,12 @@
 package com.example.ui.screens.settings
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AccentPalettes
+import com.example.ui.theme.LocalCompactMode
 import com.example.ui.theme.LocalExtendedColors
 import com.example.viewmodel.ToodlyViewModel
 
@@ -38,6 +43,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val extendedColors = LocalExtendedColors.current
+    val isCompact = LocalCompactMode.current
 
     val themeMode by viewModel.themeMode.collectAsState()
     val accentColor by viewModel.accentColor.collectAsState()
@@ -53,6 +59,25 @@ fun SettingsScreen(
     var exportedJsonText by remember { mutableStateOf("") }
     var importJsonInput by remember { mutableStateOf("") }
 
+    var notificationPermissionGranted by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        notificationPermissionGranted = isGranted
+        if (isGranted) {
+            viewModel.sendTestNotification()
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         modifier = modifier.fillMaxSize()
@@ -61,68 +86,85 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 18.dp)
+                .padding(horizontal = if (isCompact) 12.dp else 18.dp)
         ) {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(if (isCompact) 6.dp else 12.dp))
 
             Text(
                 text = "Settings",
-                fontSize = 26.sp,
+                fontSize = if (isCompact) 22.sp else 26.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = extendedColors.textPrimary,
                 letterSpacing = (-0.5).sp
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
             Text(
-                text = "Customize your experience and manage data",
-                fontSize = 15.sp,
+                text = "Customize themes, notifications, and compact mode",
+                fontSize = if (isCompact) 13.sp else 15.sp,
                 fontWeight = FontWeight.Normal,
                 color = extendedColors.textSecondary
             )
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(if (isCompact) 10.dp else 16.dp))
 
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isCompact) 10.dp else 14.dp),
                 contentPadding = PaddingValues(bottom = 80.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("settings_list")
             ) {
-                // Appearance Card
+                // Appearance & Themes Card
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(24.dp),
+                        shape = RoundedCornerShape(if (isCompact) 18.dp else 24.dp),
                         colors = CardDefaults.cardColors(containerColor = extendedColors.cardBackground),
                         border = BorderStroke(1.dp, extendedColors.cardBorder)
                     ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            Text("Appearance & Theme", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = extendedColors.textPrimary)
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Theme Selector
+                        Column(modifier = Modifier.padding(if (isCompact) 14.dp else 18.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                listOf("SYSTEM" to "System", "LIGHT" to "Light", "DARK" to "Dark").forEach { (modeKey, modeLabel) ->
+                                Text("Appearance & Theme", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = extendedColors.textPrimary)
+                                val currentPalette = AccentPalettes[accentColor]
+                                Text(currentPalette?.displayName ?: accentColor, fontSize = 12.sp, color = extendedColors.customAccent, fontWeight = FontWeight.SemiBold)
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Theme Mode Selector
+                            Text("Canvas Mode", fontSize = 12.5.sp, fontWeight = FontWeight.Medium, color = extendedColors.textSecondary)
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            val themeModes = listOf(
+                                "SYSTEM" to "System",
+                                "LIGHT" to "Light",
+                                "DARK" to "Dark",
+                                "CREAM" to "Cream Paper",
+                                "OLED" to "OLED Black"
+                            )
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(themeModes) { (modeKey, modeLabel) ->
                                     val isSelected = themeMode == modeKey
                                     Box(
                                         modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(12.dp))
+                                            .clip(RoundedCornerShape(10.dp))
                                             .background(if (isSelected) extendedColors.customAccent else extendedColors.subtleBackground)
                                             .clickable { viewModel.setThemeMode(modeKey) }
-                                            .padding(vertical = 10.dp)
+                                            .padding(horizontal = 12.dp, vertical = 8.dp)
                                             .testTag("theme_button_$modeKey"),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = modeLabel,
-                                            fontSize = 13.sp,
+                                            fontSize = 12.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = if (isSelected) Color.White else extendedColors.textPrimary
                                         )
@@ -130,32 +172,50 @@ fun SettingsScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
 
-                            // Accent Colors
-                            Text("Accent Color", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = extendedColors.textSecondary)
+                            // Accent Colors (10 Curated Palettes)
+                            Text("Color Theme Palette", fontSize = 12.5.sp, fontWeight = FontWeight.Medium, color = extendedColors.textSecondary)
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
                                 items(AccentPalettes.entries.toList()) { (name, palette) ->
                                     val isSelected = accentColor == name
-                                    Box(
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
                                         modifier = Modifier
-                                            .size(42.dp)
-                                            .clip(CircleShape)
-                                            .background(palette.primary)
-                                            .border(
-                                                width = if (isSelected) 3.dp else 0.dp,
-                                                color = if (isSelected) extendedColors.textPrimary else Color.Transparent,
-                                                shape = CircleShape
-                                            )
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isSelected) extendedColors.subtleBackground else Color.Transparent)
                                             .clickable { viewModel.setAccentColor(name) }
-                                            .testTag("accent_color_$name"),
-                                        contentAlignment = Alignment.Center
+                                            .padding(horizontal = 6.dp, vertical = 6.dp)
+                                            .testTag("accent_color_$name")
                                     ) {
-                                        if (isSelected) {
-                                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(CircleShape)
+                                                .background(palette.primary)
+                                                .border(
+                                                    width = if (isSelected) 2.5.dp else 0.dp,
+                                                    color = if (isSelected) extendedColors.textPrimary else Color.Transparent,
+                                                    shape = CircleShape
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (isSelected) {
+                                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                            }
                                         }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = palette.name,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) extendedColors.customAccent else extendedColors.textSecondary
+                                        )
                                     }
                                 }
                             }
@@ -163,16 +223,153 @@ fun SettingsScreen(
                     }
                 }
 
-                // Preferences Card
+                // Compact Mode & Layout Card
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(24.dp),
+                        shape = RoundedCornerShape(if (isCompact) 18.dp else 24.dp),
                         colors = CardDefaults.cardColors(containerColor = extendedColors.cardBackground),
                         border = BorderStroke(1.dp, extendedColors.cardBorder)
                     ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            Text("Preferences", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = extendedColors.textPrimary)
+                        Column(modifier = Modifier.padding(if (isCompact) 14.dp else 18.dp)) {
+                            Text("Display & Layout Density", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = extendedColors.textPrimary)
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("Compact Mode", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = extendedColors.textPrimary)
+                                        if (compactMode) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(extendedColors.customAccentLight)
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text("ACTIVE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = extendedColors.customAccent)
+                                            }
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text("Dense layout, tighter spacing, and streamlined task cards for small display phones", fontSize = 12.sp, color = extendedColors.textSecondary)
+                                }
+                                Switch(
+                                    checked = compactMode,
+                                    onCheckedChange = { enabled ->
+                                        viewModel.setCompactMode(enabled)
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = extendedColors.customAccent
+                                    ),
+                                    modifier = Modifier.testTag("compact_mode_switch")
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Push Notifications & Reminders Card
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(if (isCompact) 18.dp else 24.dp),
+                        colors = CardDefaults.cardColors(containerColor = extendedColors.cardBackground),
+                        border = BorderStroke(1.dp, extendedColors.cardBorder)
+                    ) {
+                        Column(modifier = Modifier.padding(if (isCompact) 14.dp else 18.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Push Notifications & Reminders", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = extendedColors.textPrimary)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (notificationPermissionGranted) extendedColors.customAccentLight else MaterialTheme.colorScheme.errorContainer)
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = if (notificationPermissionGranted) "Ready 🔔" else "Permission Needed",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (notificationPermissionGranted) extendedColors.customAccent else MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Text("Receive timely on-device alerts when your to-do items are due.", fontSize = 12.sp, color = extendedColors.textSecondary)
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Send Test Notification Button
+                            Button(
+                                onClick = {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificationPermissionGranted) {
+                                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    } else {
+                                        viewModel.sendTestNotification()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().testTag("send_test_notification_button"),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = extendedColors.customAccent)
+                            ) {
+                                Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Send Test Push Notification Now 🚀", fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Divider(color = extendedColors.cardBorder)
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Daily Planning reminder
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                    Text("Daily Morning Planning", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = extendedColors.textPrimary)
+                                    Text("Schedule review reminder at $dailyReminderTime", fontSize = 12.sp, color = extendedColors.textSecondary)
+                                }
+                                Switch(
+                                    checked = dailyReminderEnabled,
+                                    onCheckedChange = { enabled ->
+                                        if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificationPermissionGranted) {
+                                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                        }
+                                        viewModel.setDailyReminder(enabled, dailyReminderTime)
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = extendedColors.customAccent
+                                    ),
+                                    modifier = Modifier.testTag("daily_reminder_switch")
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // General Preferences Card
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(if (isCompact) 18.dp else 24.dp),
+                        colors = CardDefaults.cardColors(containerColor = extendedColors.cardBackground),
+                        border = BorderStroke(1.dp, extendedColors.cardBorder)
+                    ) {
+                        Column(modifier = Modifier.padding(if (isCompact) 14.dp else 18.dp)) {
+                            Text("Calendar & Preferences", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = extendedColors.textPrimary)
                             Spacer(modifier = Modifier.height(12.dp))
 
                             // Week start day
@@ -207,56 +404,6 @@ fun SettingsScreen(
                                     }
                                 }
                             }
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            // Daily Planning reminder
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text("Daily Morning Planning", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = extendedColors.textPrimary)
-                                    Text("Reminder at $dailyReminderTime", fontSize = 12.sp, color = extendedColors.textSecondary)
-                                }
-                                Switch(
-                                    checked = dailyReminderEnabled,
-                                    onCheckedChange = { enabled ->
-                                        viewModel.setDailyReminder(enabled, dailyReminderTime)
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = extendedColors.customAccent
-                                    ),
-                                    modifier = Modifier.testTag("daily_reminder_switch")
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            // Compact Mode for small display phones
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                                    Text("Compact Mode", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = extendedColors.textPrimary)
-                                    Text("Dense layout & smaller cards for small displays", fontSize = 12.sp, color = extendedColors.textSecondary)
-                                }
-                                Switch(
-                                    checked = compactMode,
-                                    onCheckedChange = { enabled ->
-                                        viewModel.setCompactMode(enabled)
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = extendedColors.customAccent
-                                    ),
-                                    modifier = Modifier.testTag("compact_mode_switch")
-                                )
-                            }
                         }
                     }
                 }
@@ -265,14 +412,14 @@ fun SettingsScreen(
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(24.dp),
+                        shape = RoundedCornerShape(if (isCompact) 18.dp else 24.dp),
                         colors = CardDefaults.cardColors(containerColor = extendedColors.cardBackground),
                         border = BorderStroke(1.dp, extendedColors.cardBorder)
                     ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
+                        Column(modifier = Modifier.padding(if (isCompact) 14.dp else 18.dp)) {
                             Text("Data & Privacy", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = extendedColors.textPrimary)
                             Spacer(modifier = Modifier.height(6.dp))
-                            Text("Your tasks are stored strictly on your device.", fontSize = 12.sp, color = extendedColors.textSecondary)
+                            Text("Your tasks are stored strictly offline on your device.", fontSize = 12.sp, color = extendedColors.textSecondary)
                             Spacer(modifier = Modifier.height(14.dp))
 
                             // Export JSON
@@ -284,7 +431,7 @@ fun SettingsScreen(
                                         exportedJsonText = viewModel.exportTasksJson()
                                         showExportDialog = true
                                     }
-                                    .padding(vertical = 10.dp),
+                                    .padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(Icons.Outlined.FileDownload, contentDescription = null, tint = extendedColors.customAccent)
@@ -304,7 +451,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
                                     .clickable { showImportDialog = true }
-                                    .padding(vertical = 10.dp),
+                                    .padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(Icons.Outlined.FileUpload, contentDescription = null, tint = extendedColors.customAccent)
@@ -324,7 +471,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
                                     .clickable { showClearDataDialog = true }
-                                    .padding(vertical = 10.dp),
+                                    .padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(Icons.Outlined.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
@@ -342,12 +489,12 @@ fun SettingsScreen(
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(24.dp),
+                        shape = RoundedCornerShape(if (isCompact) 18.dp else 24.dp),
                         colors = CardDefaults.cardColors(containerColor = extendedColors.cardBackground),
                         border = BorderStroke(1.dp, extendedColors.cardBorder)
                     ) {
                         Column(
-                            modifier = Modifier.padding(18.dp),
+                            modifier = Modifier.padding(if (isCompact) 14.dp else 18.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Box(
@@ -360,13 +507,13 @@ fun SettingsScreen(
                                 Icon(Icons.Default.Check, contentDescription = null, tint = extendedColors.customAccent)
                             }
 
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            Text("Toodly v1.0", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = extendedColors.textPrimary)
-                            Text("100% Free & Open Task Manager", fontSize = 12.sp, color = extendedColors.textSecondary)
                             Spacer(modifier = Modifier.height(8.dp))
+
+                            Text("Toodly v1.1", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = extendedColors.textPrimary)
+                            Text("100% Free, Offline & Open Task Manager", fontSize = 12.sp, color = extendedColors.textSecondary)
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                "No paywalls, no subscriptions, no ads. Built for effortless daily productivity.",
+                                "Zero ads, zero subscriptions. Beautiful aesthetic pastel themes & push notifications.",
                                 fontSize = 12.sp,
                                 color = extendedColors.textTertiary,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center

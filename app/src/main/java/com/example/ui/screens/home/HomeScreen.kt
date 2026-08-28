@@ -30,6 +30,7 @@ import com.example.data.model.CategoryEntity
 import com.example.data.model.TaskItem
 import com.example.ui.components.QuickAddSheet
 import com.example.ui.components.TaskCard
+import com.example.ui.components.WeeklyOverview
 import com.example.ui.components.getCategoryPastelColors
 import com.example.ui.screens.taskdetail.TaskDetailDialog
 import com.example.ui.theme.LocalCompactMode
@@ -58,9 +59,14 @@ fun HomeScreen(
     val filterState by viewModel.filterState.collectAsState()
     val todayCompleted by viewModel.todayCompletedCount.collectAsState()
     val todayTotal by viewModel.todayTotalCount.collectAsState()
+    val weeklyCompleted by viewModel.weeklyCompletedCount.collectAsState()
+    val weeklyTotal by viewModel.weeklyTotalCount.collectAsState()
+    val weeklyDays by viewModel.weeklyDayStats.collectAsState()
+    val weekRangeLabel by viewModel.currentWeekRangeLabel.collectAsState()
     val userName by viewModel.userName.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
 
+    var showWeeklyOverview by remember { mutableStateOf(false) }
     var showQuickAdd by remember { mutableStateOf(false) }
     var selectedTaskForDetail by remember { mutableStateOf<TaskItem?>(null) }
     var showSearchBar by remember { mutableStateOf(false) }
@@ -198,81 +204,156 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(if (isCompact) 8.dp else 14.dp))
 
-            // Good Morning Progress Card (matching mockup)
-            Card(
+            // Overview Section with Today vs Weekly Toggle
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("home_greeting_card"),
-                shape = RoundedCornerShape(if (isCompact) 16.dp else 24.dp),
-                colors = CardDefaults.cardColors(containerColor = extendedColors.cardBackground),
-                border = BorderStroke(1.dp, extendedColors.cardBorder),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
+                    .padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Text(
+                    text = if (showWeeklyOverview) "Weekly Progress" else "Daily Overview",
+                    fontSize = if (isCompact) 12.sp else 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = extendedColors.textSecondary
+                )
+
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(if (isCompact) 12.dp else 18.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(extendedColors.subtleBackground)
+                        .padding(2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(if (isCompact) 38.dp else 48.dp)
-                                .clip(RoundedCornerShape(if (isCompact) 12.dp else 16.dp))
-                                .background(PastelYellowLight),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.WbSunny,
-                                contentDescription = null,
-                                tint = PastelYellow,
-                                modifier = Modifier.size(if (isCompact) 22.dp else 28.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(if (isCompact) 10.dp else 14.dp))
-
-                        Column {
-                            Text(
-                                text = "Good Morning, $userName!",
-                                fontSize = if (isCompact) 15.sp else 17.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = extendedColors.textPrimary
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            val remaining = (todayTotal - todayCompleted).coerceAtLeast(0)
-                            Text(
-                                text = if (remaining == 0 && todayTotal > 0) "All tasks completed! 🎉" else "$remaining tasks to complete today",
-                                fontSize = if (isCompact) 11.5.sp else 13.sp,
-                                color = extendedColors.textSecondary
-                            )
-                        }
-                    }
-
-                    // Circular or Pill progress
-                    val progress = if (todayTotal > 0) todayCompleted.toFloat() / todayTotal.toFloat() else 0f
                     Box(
                         modifier = Modifier
-                            .size(if (isCompact) 36.dp else 44.dp),
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (!showWeeklyOverview) extendedColors.cardBackground else Color.Transparent)
+                            .clickable { showWeeklyOverview = false }
+                            .padding(horizontal = if (isCompact) 8.dp else 10.dp, vertical = 3.dp)
+                            .testTag("home_overview_toggle_today"),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier.fillMaxSize(),
-                            color = extendedColors.customAccent,
-                            trackColor = extendedColors.subtleBackground,
-                            strokeWidth = if (isCompact) 3.5.dp else 4.dp
-                        )
                         Text(
-                            text = "${(progress * 100).toInt()}%",
-                            fontSize = if (isCompact) 10.sp else 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = extendedColors.textPrimary
+                            text = "Today",
+                            fontSize = if (isCompact) 11.sp else 12.sp,
+                            fontWeight = if (!showWeeklyOverview) FontWeight.Bold else FontWeight.Normal,
+                            color = if (!showWeeklyOverview) extendedColors.customAccent else extendedColors.textSecondary
                         )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (showWeeklyOverview) extendedColors.cardBackground else Color.Transparent)
+                            .clickable { showWeeklyOverview = true }
+                            .padding(horizontal = if (isCompact) 8.dp else 10.dp, vertical = 3.dp)
+                            .testTag("home_overview_toggle_week"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "This Week",
+                            fontSize = if (isCompact) 11.sp else 12.sp,
+                            fontWeight = if (showWeeklyOverview) FontWeight.Bold else FontWeight.Normal,
+                            color = if (showWeeklyOverview) extendedColors.customAccent else extendedColors.textSecondary
+                        )
+                    }
+                }
+            }
+
+            AnimatedContent(
+                targetState = showWeeklyOverview,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(220))
+                },
+                label = "overview_card_switch"
+            ) { isWeekly ->
+                if (isWeekly) {
+                    WeeklyOverview(
+                        completedTasks = weeklyCompleted,
+                        totalTasks = weeklyTotal,
+                        weekDays = weeklyDays,
+                        weekRangeLabel = weekRangeLabel
+                    )
+                } else {
+                    // Good Morning Progress Card (matching mockup)
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("home_greeting_card"),
+                        shape = RoundedCornerShape(if (isCompact) 16.dp else 24.dp),
+                        colors = CardDefaults.cardColors(containerColor = extendedColors.cardBackground),
+                        border = BorderStroke(1.dp, extendedColors.cardBorder),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(if (isCompact) 12.dp else 18.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(if (isCompact) 38.dp else 48.dp)
+                                        .clip(RoundedCornerShape(if (isCompact) 12.dp else 16.dp))
+                                        .background(PastelYellowLight),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.WbSunny,
+                                        contentDescription = null,
+                                        tint = PastelYellow,
+                                        modifier = Modifier.size(if (isCompact) 22.dp else 28.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(if (isCompact) 10.dp else 14.dp))
+
+                                Column {
+                                    Text(
+                                        text = "Good Morning, $userName!",
+                                        fontSize = if (isCompact) 15.sp else 17.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = extendedColors.textPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    val remaining = (todayTotal - todayCompleted).coerceAtLeast(0)
+                                    Text(
+                                        text = if (remaining == 0 && todayTotal > 0) "All tasks completed! 🎉" else "$remaining tasks to complete today",
+                                        fontSize = if (isCompact) 11.5.sp else 13.sp,
+                                        color = extendedColors.textSecondary
+                                    )
+                                }
+                            }
+
+                            // Circular progress
+                            val progress = if (todayTotal > 0) todayCompleted.toFloat() / todayTotal.toFloat() else 0f
+                            Box(
+                                modifier = Modifier
+                                    .size(if (isCompact) 36.dp else 44.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    progress = { progress },
+                                    modifier = Modifier.fillMaxSize(),
+                                    color = extendedColors.customAccent,
+                                    trackColor = extendedColors.subtleBackground,
+                                    strokeWidth = if (isCompact) 3.5.dp else 4.dp
+                                )
+                                Text(
+                                    text = "${(progress * 100).toInt()}%",
+                                    fontSize = if (isCompact) 10.sp else 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = extendedColors.textPrimary
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -437,8 +518,8 @@ fun HomeScreen(
         QuickAddSheet(
             categories = categories,
             onDismiss = { showQuickAdd = false },
-            onAddTask = { title, category, dueDate, dueTime, priority ->
-                viewModel.quickAddTask(title, category, dueDate, dueTime, priority)
+            onAddTask = { title, category, dueDate, dueTime, priority, hasReminder ->
+                viewModel.quickAddTask(title, category, dueDate, dueTime, priority, hasReminder)
             }
         )
     }
