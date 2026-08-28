@@ -1,0 +1,6 @@
+{
+  "name": "Toodly",
+  "description": "A beautiful, fast, distraction-free minimal task management app.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
